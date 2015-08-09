@@ -17,7 +17,6 @@
 
 		if ($_SERVER["REQUEST_METHOD"] == "POST") {
 			if (isset($_POST['start'])) {
-				
 				$time = intval(test_input($_POST["time"]));
 				$cmd = 'echo '.$time.' > data/test';
 				system($cmd);
@@ -30,6 +29,10 @@
 				sleep(2);
 				// echo "stop";
 				$run = 0;
+			} elseif (isset($_POST['shutdown'])) {
+
+				system('echo 1 > data/shutdown');
+				system('sudo shutdown -h +0');
 			}
 
 		}
@@ -76,18 +79,7 @@
 
 					function read_data_from_file($number_of_sensor){
 						global $data_array;
-
-						echo "Number of sensors is $number_of_sensor<br>";
-						echo "<br>";
-
-						echo "<table border=\"1\" style=\"width:100%\">";
-						echo "<tr>";
-						echo "<td><strong>t(ms)</strong></td>";
-						for ($i = 1; $i <= $number_of_sensor; $i++){
-							echo "<td><strong>Sensor[$i]</strong></td>";
-						}
-						echo "</tr>";
-
+						echo "<strong>Number of sensors is $number_of_sensor</strong><br>";
 						$xml=simplexml_load_file("data/data.xml");
 						if ($xml ===FALSE)
 						{
@@ -95,23 +87,43 @@
 						}
 						else
 						{
+							echo "<strong>Number of sample is: ".sizeof($xml->children())."</strong>";
+							echo "<br><br>";
+
+							echo "<table border=\"1\" style=\"width:100%\">";
+							echo "<tr>";
+							echo "<td><strong>t(ms)</strong></td>";
+							for ($i = 1; $i <= $number_of_sensor; $i++)
+							{
+								echo "<td><strong>Sensor[$i]</strong></td>";
+							}
+							echo "</tr>";
+							$number_of_items = 0;
 							foreach($xml->children() as $items)
 							{
-								echo "<tr>";
+								$number_of_items ++;
+
+								if ($number_of_items < 100) echo "<tr>";
 								$temp_arr = array($items->t);
 
-								echo "<td>$items->t</td>";
+								if ($number_of_items < 100) echo "<td>$items->t</td>";
 								$s = $items->sensor;
 								for ($i = 0; $i < $number_of_sensor; $i++){
 									$x = $s[$i];
 									array_push($temp_arr, $x);
-									echo "<td>$x</td>";
+									if ($number_of_items < 100) echo "<td>$x</td>";
 								}
-								echo "</tr>";
+								if ($number_of_items < 100) echo "</tr>";
 								array_push($data_array, $temp_arr);
-								// echo 'Size of = '.sizeof($data_array).' <br>';
-								// echo 'Size of = '.sizeof($temp_arr).' <br>';
-							} 
+							}
+							/* Add dot dot dot ... */
+							if ($number_of_items > 100)
+							{
+								echo "<tr>";
+								echo "<td>...</td>";
+								for ($i = 0; $i < $number_of_sensor; $i++) echo "<td>...</td>";
+								echo "</tr>";
+							}
 						}
 						echo "</table>";
 					}
@@ -128,22 +140,27 @@
 					Interval time: <input type="number" name="time"> milisecond <br>
 					<input type="submit" name="start" value="Start">
 					<input type="submit" name="stop" value="Stop"> 
+					<input type="submit" name="shutdown" value="Shutdown"> 
 				</form>
 				<form>
-					<label id="time_cout">0</label> Samples <br>
-					<script>
-						var sample = 0;
-						
-						function myTimer() {
-						    sample  = sample + 1;
-						    document.getElementById("time_cout").innerHTML = "" + sample;
-						}
-						
-						<?php
+					<?php 
+						if ($run == 1) 
+						{
+							echo '<font size="3" color="blue">Running</font> :';
+							echo '<label id="time_cout">0</label> Samples <br>';
+							echo '<script>';
+							echo 'var sample = 0;';
+							echo '';
+							echo 'function myTimer() {';
+							echo '    sample  = sample + 1;';
+							echo '    document.getElementById("time_cout").innerHTML = "" + sample;';
+							echo '}';
+			
 							if ($run == 1)
 							{
 								echo 'var myVar=setInterval(function () {myTimer()}, '.$time.');';
 							}
+						}
 						?>
 						
 					</script> 
@@ -162,8 +179,7 @@
 						$example_data = array();
 
 						foreach ($data_array as $items) {
-							// $test = $test + 1.5;
-							$test = floatval($items[$id])*100;
+							$test = floatval($items[$id]);
 							array_push($example_data, array($items[0] / 1000.0, $test));
 						}
 						$plot->SetTitle('Sensor '.$id);
@@ -174,7 +190,7 @@
 						$x = $plot->DrawGraph();
 						echo "<img src=\"" . $plot->EncodeImage() . "\">\n";
 					}
-					for ($i = 1; $i < $number_of_sensor; $i++)
+					for ($i = 1; $i <= $number_of_sensor; $i++)
 					{
 						draw_plot($i);
 					}
